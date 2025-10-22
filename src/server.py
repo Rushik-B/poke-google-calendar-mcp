@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from googleapiclient.errors import HttpError
+from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import PlainTextResponse
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,6 +22,23 @@ from google_calendar import (
 
 
 mcp = FastMCP("Poke Google Calendar MCP")
+
+# Enable CORS so browser-based clients (e.g., MCP Inspector, Poke) can call the server
+mcp.app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def _healthcheck(_request):
+    return PlainTextResponse("OK", headers={"Cache-Control": "no-store"})
+
+
+# Basic health endpoint for Render/health checks
+mcp.app.add_route("/", _healthcheck, methods=["GET", "HEAD"]) 
 
 
 def _error_response(exc: Exception) -> Dict[str, Any]:
