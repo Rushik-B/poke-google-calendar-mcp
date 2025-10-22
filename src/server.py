@@ -34,22 +34,22 @@ except ModuleNotFoundError:
 
 mcp = FastMCP("Poke Google Calendar MCP")
 
-# Enable CORS so browser-based clients (e.g., MCP Inspector, Poke) can call the server
-mcp.app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# FastMCP 2.12.x may not expose `.app`. Detect an ASGI app attribute before modifying middleware/routes.
+_http_app = getattr(mcp, "app", None) or getattr(mcp, "http_app", None)
+if _http_app is not None:
+    _http_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
+    def _healthcheck(_request):
+        return PlainTextResponse("OK", headers={"Cache-Control": "no-store"})
 
-def _healthcheck(_request):
-    return PlainTextResponse("OK", headers={"Cache-Control": "no-store"})
-
-
-# Basic health endpoint for Render/health checks
-mcp.app.add_route("/", _healthcheck, methods=["GET", "HEAD"]) 
+    # Basic health endpoint for platform health checks
+    _http_app.add_route("/", _healthcheck, methods=["GET", "HEAD"]) 
 
 
 def _error_response(exc: Exception) -> Dict[str, Any]:
