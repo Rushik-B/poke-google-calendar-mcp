@@ -11,14 +11,25 @@ from starlette.responses import PlainTextResponse
 # Load environment variables from .env file
 load_dotenv()
 
-from google_calendar import (
-    list_calendars as gc_list_calendars,
-    list_events as gc_list_events,
-    create_event as gc_create_event,
-    update_event as gc_update_event,
-    delete_event as gc_delete_event,
-    resolve_calendar_id as gc_resolve_calendar_id,
-)
+try:
+    from google_calendar import (
+        list_calendars as gc_list_calendars,
+        list_events as gc_list_events,
+        create_event as gc_create_event,
+        update_event as gc_update_event,
+        delete_event as gc_delete_event,
+        resolve_calendar_id as gc_resolve_calendar_id,
+    )
+except ModuleNotFoundError:
+    # Fallback when the working directory is the repo root and imports require the package prefix
+    from src.google_calendar import (
+        list_calendars as gc_list_calendars,
+        list_events as gc_list_events,
+        create_event as gc_create_event,
+        update_event as gc_update_event,
+        delete_event as gc_delete_event,
+        resolve_calendar_id as gc_resolve_calendar_id,
+    )
 
 
 mcp = FastMCP("Poke Google Calendar MCP")
