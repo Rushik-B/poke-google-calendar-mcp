@@ -7,7 +7,12 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 # Load environment variables from .env file
 load_dotenv()
 
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar",
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+]
 
 
 def main() -> None:
@@ -34,7 +39,12 @@ def main() -> None:
     }
 
     flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
-    creds = flow.run_local_server(open_browser=True)
+    creds = flow.run_local_server(
+        open_browser=True,
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+    )
 
     if not creds.refresh_token:
         print("ERROR: No refresh token returned. Ensure you haven't previously consented with same scope, or reset test users.", file=sys.stderr)
