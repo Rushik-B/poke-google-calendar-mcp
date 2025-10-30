@@ -31,23 +31,10 @@ def build_service():
         scopes=SCOPES,
     )
     
-    # Force refresh to check if token is valid
-    try:
-        creds.refresh(None)
-    except RefreshError as e:
-        error_msg = str(e)
-        if "invalid_grant" in error_msg or "expired" in error_msg.lower() or "revoked" in error_msg.lower():
-            raise RefreshError(
-                f"Refresh token has expired or been revoked. Please generate a new refresh token using:\n"
-                f"python3 scripts/get_google_refresh_token.py\n\n"
-                f"Original error: {error_msg}"
-            ) from e
-        raise
-    
     return build("calendar", "v3", credentials=creds, cache_discovery=False)
 
 
-def _retry(fn, *args, service=None, **kwargs):
+def _retry(fn, *args, **kwargs):
     backoff = 1.0
     for attempt in range(5):
         try:
@@ -58,20 +45,16 @@ def _retry(fn, *args, service=None, **kwargs):
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 8)
                 continue
-            # Handle 401 Unauthorized - try refreshing token once
-            if status == 401 and service is not None:
-                try:
-                    # Get credentials from service and refresh
-                    creds = service._http.credentials
-                    if creds and creds.refresh_token:
-                        creds.refresh(None)
-                        # Retry the request once after refresh
-                        return fn(*args, **kwargs)
-                except Exception:
-                    pass  # If refresh fails, raise original error
             raise
         except RefreshError as e:
-            # Re-raise refresh errors with helpful message
+            # Provide helpful error message for expired refresh tokens
+            error_msg = str(e)
+            if "invalid_grant" in error_msg or "expired" in error_msg.lower() or "revoked" in error_msg.lower():
+                raise RefreshError(
+                    f"Refresh token has expired or been revoked. Please generate a new refresh token using:\n"
+                    f"python3 scripts/get_google_refresh_token.py\n\n"
+                    f"Original error: {error_msg}"
+                ) from e
             raise
         except Exception:
             # Non-HttpError, do not retry to avoid masking bugs
@@ -83,7 +66,7 @@ def list_calendars(service=None) -> List[Dict[str, Any]]:
     calendars: List[Dict[str, Any]] = []
     page_token: Optional[str] = None
     while True:
-        resp = _retry(service.calendarList().list(pageToken=page_token).execute, service=service)
+        resp = _retry(service.calendarList().list(pageToken=page_token).execute)
         for item in resp.get("items", []):
             calendars.append(
                 {
@@ -107,7 +90,7 @@ def resolve_calendar_id(query: Optional[str], service=None) -> str:
     # Accept direct ID
     try:
         # Quick probe: get calendar by id
-        _retry(service.calendars().get(calendarId=query).execute, service=service)
+        _retry(service.calendars().get(calendarId=query).execute)
         return query
     except Exception:
         pass
@@ -147,7 +130,7 @@ def list_events(
         if query:
             params["q"] = query
 
-        resp = _retry(service.events().list(**params).execute, service=service)
+        resp = _retry(service.events().list(**params).execute)
         events: List[Dict[str, Any]] = []
         for ev in resp.get("items", []):
             start = ev.get("start", {})
@@ -209,7 +192,7 @@ def create_event(
     if attendees:
         body["attendees"] = [{"email": e} for e in attendees]
 
-    ev = _retry(service.events().insert(calendarId=calendar_id, body=body).execute, service=service)
+    ev = _retry(service.events().insert(calendarId=calendar_id, body=body).execute)
     return {
         "ok": True,
         "event": {
@@ -254,7 +237,7 @@ def update_event(
     if "attendees" in patch and isinstance(patch["attendees"], list):
         body["attendees"] = [{"email": e} for e in patch["attendees"] if isinstance(e, str)]
 
-    ev = _retry(service.events().patch(calendarId=calendar_id, eventId=event_id, body=body).execute, service=service)
+    ev = _retry(service.events().patch(calendarId=calendar_id, eventId=event_id, body=body).execute)
     return {
         "ok": True,
         "event": {
@@ -275,7 +258,7 @@ def update_event(
 def delete_event(calendar: str, event_id: str, service=None) -> Dict[str, Any]:
     service = service or build_service()
     calendar_id = resolve_calendar_id(calendar, service)
-    _retry(service.events().delete(calendarId=calendar_id, eventId=event_id).execute, service=service)
+    _retry(service.events().delete(calendarId=calendar_id, eventId=event_id).execute)
     return {"ok": True}
 
 
