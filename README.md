@@ -19,7 +19,14 @@ pip install -r requirements.txt
 
 ### One-time local OAuth (to obtain refresh token)
 
-Create a Google Cloud project and enable "Google Calendar API". Create OAuth 2.0 Client credentials with Application type = Desktop app. Then run:
+Create a Google Cloud project and enable "Google Calendar API". Create OAuth 2.0 Client credentials with Application type = Desktop app.
+
+**Important for long-lived tokens:**
+- Publish your OAuth consent screen (not just "Testing" mode) for refresh tokens to last longer
+- Add yourself as a test user if still in testing mode
+- The script will automatically request offline access with consent prompt to ensure a refresh token is issued
+
+Then run:
 
 ```bash
 export GOOGLE_CLIENT_ID=your_client_id
@@ -28,6 +35,8 @@ python3 scripts/get_google_refresh_token.py
 ```
 
 Copy the output `GOOGLE_REFRESH_TOKEN` value.
+
+**Note:** If your refresh token expires, regenerate it using the same script. The updated script ensures tokens are issued with proper offline access settings.
 
 Copy `.env.example` to `.env` and fill in your credentials:
 

@@ -34,7 +34,13 @@ def main() -> None:
     }
 
     flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
-    creds = flow.run_local_server(open_browser=True)
+    # Explicitly request offline access and force consent to ensure refresh token is issued
+    # This ensures we get a refresh token that lasts longer
+    creds = flow.run_local_server(
+        open_browser=True,
+        access_type='offline',
+        prompt='consent'  # Force consent screen to ensure refresh token is issued
+    )
 
     if not creds.refresh_token:
         print("ERROR: No refresh token returned. Ensure you haven't previously consented with same scope, or reset test users.", file=sys.stderr)
