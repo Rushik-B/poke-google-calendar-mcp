@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, Literal
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -118,9 +118,9 @@ def create_event(
     time_zone: Optional[str] = None,
     description: Optional[str] = None,
     location: Optional[str] = None,
-    attendees: Any = None,
-    reminders: Any = None,
-    send_updates: Optional[str] = None,
+    attendees: Optional[Union[List[str], str, Dict[str, Any]]] = None,
+    reminders: Optional[Union[bool, List[Dict[str, Any]], Dict[str, Any]]] = None,
+    send_updates: Optional[Literal["all", "externalOnly", "none"]] = None,
 ) -> Dict[str, Any]:
     try:
         normalized_attendees = _normalize_attendees(attendees)
