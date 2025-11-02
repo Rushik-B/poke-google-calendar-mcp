@@ -65,6 +65,64 @@ def _normalize_attendees(value: Any) -> Optional[List[str]]:
     return None
 
 
+def _normalize_reminder_minutes(value: Any) -> Optional[List[int]]:
+    """Accept list[int|float|str] or comma-separated string like "1h, 30m, 90" (minutes).
+    Returns a sorted, deduplicated list of non-negative minute integers.
+    """
+    if value is None:
+        return None
+    raw_items: List[Any] = []
+    if isinstance(value, list):
+        raw_items = value
+    elif isinstance(value, str):
+        raw_items = [part.strip() for part in value.split(",") if part.strip()]
+    else:
+        return None
+
+    minutes: List[int] = []
+    for item in raw_items:
+        if isinstance(item, (int, float)):
+            m = int(item)
+            if m >= 0:
+                minutes.append(m)
+            continue
+        if isinstance(item, str):
+            s = item.strip().lower().replace(" ", "")
+            # Normalize units
+            s = (
+                s.replace("hours", "h")
+                .replace("hour", "h")
+                .replace("mins", "m")
+                .replace("minute", "m")
+                .replace("minutes", "m")
+                .replace("min", "m")
+            )
+            try:
+                if s.endswith("h"):
+                    val = float(s[:-1])
+                    m = int(val * 60)
+                    if m >= 0:
+                        minutes.append(m)
+                elif s.endswith("m"):
+                    val = float(s[:-1])
+                    m = int(val)
+                    if m >= 0:
+                        minutes.append(m)
+                else:
+                    # Bare number implies minutes
+                    val = float(s)
+                    m = int(val)
+                    if m >= 0:
+                        minutes.append(m)
+            except Exception:
+                # Skip unparseable entries
+                continue
+
+    # Deduplicate and sort
+    dedup_sorted = sorted({m for m in minutes})
+    return dedup_sorted
+
+
 @mcp.tool(description="List all calendars accessible to the user")
 def list_calendars() -> Dict[str, Any]:
     try:
@@ -106,7 +164,7 @@ def list_events(
     description=(
         "Create a calendar event. Start/end are ISO 8601 or all-day date (YYYY-MM-DD). "
         "Attendees may be a list of emails, a comma-separated string, an empty object, or an object with an 'emails' array. "
-        "To configure event reminders, pass 'reminders' as either a dict with 'useDefault' and/or 'overrides' (method: 'email'|'popup', minutes: int), or a list of overrides. "
+        "To set reminders, pass 'reminder_minutes' as an array (or comma-separated string) of minutes before start, e.g. [120, 60] or '2h, 60m'. "
         "To control attendee notifications, set 'send_updates' to 'all' | 'externalOnly' | 'none'."
     )
 )
@@ -119,11 +177,20 @@ def create_event(
     description: Optional[str] = None,
     location: Optional[str] = None,
     attendees: Optional[Union[List[str], str, Dict[str, Any]]] = None,
-    reminders: Optional[Union[bool, List[Dict[str, Any]], Dict[str, Any]]] = None,
+    reminder_minutes: Optional[Union[List[int], str]] = None,
     send_updates: Optional[Literal["all", "externalOnly", "none"]] = None,
 ) -> Dict[str, Any]:
     try:
         normalized_attendees = _normalize_attendees(attendees)
+        minutes_list = _normalize_reminder_minutes(reminder_minutes)
+        reminders_payload: Optional[Dict[str, Any]] = None
+        if minutes_list is not None:
+            # If list is empty, disable reminders; otherwise set popup overrides
+            reminders_payload = {"useDefault": False}
+            if len(minutes_list) > 0:
+                reminders_payload["overrides"] = [
+                    {"method": "popup", "minutes": m} for m in minutes_list
+                ]
         return gc_create_event(
             calendar=calendar,
             summary=summary,
@@ -133,7 +200,7 @@ def create_event(
             description=description,
             location=location,
             attendees=normalized_attendees,
-            reminders=reminders,
+            reminders=reminders_payload,
             send_updates=send_updates,
         )
     except Exception as e:
