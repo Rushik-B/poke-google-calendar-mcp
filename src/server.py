@@ -105,7 +105,9 @@ def list_events(
 @mcp.tool(
     description=(
         "Create a calendar event. Start/end are ISO 8601 or all-day date (YYYY-MM-DD). "
-        "Attendees may be a list of emails, a comma-separated string, an empty object, or an object with an 'emails' array."
+        "Attendees may be a list of emails, a comma-separated string, an empty object, or an object with an 'emails' array. "
+        "To configure event reminders, pass 'reminders' as either a dict with 'useDefault' and/or 'overrides' (method: 'email'|'popup', minutes: int), or a list of overrides. "
+        "To control attendee notifications, set 'send_updates' to 'all' | 'externalOnly' | 'none'."
     )
 )
 def create_event(
@@ -117,6 +119,8 @@ def create_event(
     description: Optional[str] = None,
     location: Optional[str] = None,
     attendees: Any = None,
+    reminders: Any = None,
+    send_updates: Optional[str] = None,
 ) -> Dict[str, Any]:
     try:
         normalized_attendees = _normalize_attendees(attendees)
@@ -129,6 +133,8 @@ def create_event(
             description=description,
             location=location,
             attendees=normalized_attendees,
+            reminders=reminders,
+            send_updates=send_updates,
         )
     except Exception as e:
         return _error_response(e)

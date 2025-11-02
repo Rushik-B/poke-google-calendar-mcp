@@ -170,6 +170,8 @@ def create_event(
     description: Optional[str] = None,
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
+    reminders: Optional[Any] = None,
+    send_updates: Optional[str] = None,
     service=None,
 ) -> Dict[str, Any]:
     service = service or build_service()
@@ -191,8 +193,49 @@ def create_event(
         body["location"] = location
     if attendees:
         body["attendees"] = [{"email": e} for e in attendees]
+    # Reminders: accept dict with useDefault/overrides, a list of overrides, or a boolean
+    if reminders is not None:
+        rem_payload: Dict[str, Any] = {}
+        if isinstance(reminders, bool):
+            rem_payload["useDefault"] = reminders
+        elif isinstance(reminders, list):
+            cleaned: List[Dict[str, Any]] = []
+            for o in reminders:
+                if isinstance(o, dict):
+                    method = str(o.get("method", "")).lower()
+                    minutes = o.get("minutes")
+                    if method in ("email", "popup") and isinstance(minutes, (int, float)):
+                        cleaned.append({"method": method, "minutes": int(minutes)})
+            rem_payload["useDefault"] = False
+            if cleaned:
+                rem_payload["overrides"] = cleaned
+        elif isinstance(reminders, dict):
+            # Only pass through the supported keys after light validation
+            if "useDefault" in reminders:
+                rem_payload["useDefault"] = bool(reminders.get("useDefault"))
+            overrides = reminders.get("overrides")
+            if isinstance(overrides, list):
+                cleaned: List[Dict[str, Any]] = []
+                for o in overrides:
+                    if isinstance(o, dict):
+                        method = str(o.get("method", "")).lower()
+                        minutes = o.get("minutes")
+                        if method in ("email", "popup") and isinstance(minutes, (int, float)):
+                            cleaned.append({"method": method, "minutes": int(minutes)})
+                if cleaned:
+                    rem_payload["overrides"] = cleaned
+                    # If overrides provided but useDefault not explicitly set, force useDefault False
+                    if "useDefault" not in rem_payload:
+                        rem_payload["useDefault"] = False
+        if rem_payload:
+            body["reminders"] = rem_payload
 
-    ev = _retry(service.events().insert(calendarId=calendar_id, body=body).execute)
+    # Prepare insert with optional sendUpdates for attendee notifications
+    insert_kwargs: Dict[str, Any] = {"calendarId": calendar_id, "body": body}
+    if isinstance(send_updates, str) and send_updates in ("all", "externalOnly", "none"):
+        insert_kwargs["sendUpdates"] = send_updates
+
+    ev = _retry(service.events().insert(**insert_kwargs).execute)
     return {
         "ok": True,
         "event": {
