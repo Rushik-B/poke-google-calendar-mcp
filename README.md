@@ -84,12 +84,28 @@ We're working hard on improving the integration use of Poke :)
 
 - `list_calendars()` → `{ calendars: [{ id, summary, primary, accessRole, timeZone }] }`
 - `list_events(calendar?, time_min?, time_max?, max_results?, query?, include_all_calendars?)` → `{ events: [...] }`
-- `create_event(calendar, summary, start, end, time_zone?, description?, location?, attendees?)` → `{ ok, event }`
+- `create_event(calendar, summary, start, end, time_zone?, description?, location?, reminders?, recurrence?)` → `{ ok, event }`
 - `update_event(calendar, event_id, patch)` → `{ ok, event }`
-- `delete_event(calendar, event_id)` → `{ ok }`
+- `delete_event(calendar, event_id, as_instance?)` → `{ ok }`
 - `resolve_calendar(query)` → `{ calendarId, summary }`
+- `list_recurring_instances(calendar, recurring_event_id, time_min?, time_max?, max_results?)` → `{ ok, instances: [...] }`
+- `cancel_recurring_instance(calendar, instance_id? [, recurring_event_id, original_start_time] )` → `{ ok, instance }`
+- `update_following_instances(calendar, recurring_event_id, target_instance_start, change_patch, new_recurrence)` → `{ ok, newRecurringEvent }`
 
 Times are ISO 8601 (e.g., `2025-10-22T14:30:00-04:00`) or all-day dates (`YYYY-MM-DD`). When aggregating across calendars, each event includes `calendarId`.
+
+### Recurring events
+
+- Creating a recurring event: pass `recurrence` as a list of RFC 5545 strings, e.g.:
+  - `["RRULE:FREQ=WEEKLY;COUNT=5"]`
+  - `["RRULE:FREQ=WEEKLY;UNTIL=20251231T235959Z"]`
+- Listing instances of a recurring event: use `list_recurring_instances(...)`. This returns each occurrence with its `instanceId`, `recurringEventId`, and `originalStartTime`.
+- Deleting/cancelling a single occurrence:
+  - If you have an instance’s `eventId` (common when using `list_events` which flattens instances), call `delete_event(..., as_instance=true)` to cancel that occurrence.
+  - Or use `cancel_recurring_instance(...)` with either the `instance_id` directly, or the pair `recurring_event_id` + `original_start_time`.
+- Modify all following instances:
+  - Use `update_following_instances(...)` to split the series at `target_instance_start` and create a new recurring series with your `change_patch` and `new_recurrence`.
+  - Note: This helper supports dateTime events (not all-day). Provide `new_recurrence` explicitly to define how the new series should repeat.
 
 ## Customization
 
