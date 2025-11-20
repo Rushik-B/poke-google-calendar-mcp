@@ -21,11 +21,6 @@ pip install -r requirements.txt
 
 Create a Google Cloud project and enable "Google Calendar API". Create OAuth 2.0 Client credentials with Application type = Desktop app.
 
-**Important for long-lived tokens:**
-- Publish your OAuth consent screen (not just "Testing" mode) for refresh tokens to last longer
-- Add yourself as a test user if still in testing mode
-- The script will automatically request offline access with consent prompt to ensure a refresh token is issued
-
 Then run:
 
 ```bash
